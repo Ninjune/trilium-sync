@@ -1,7 +1,5 @@
 local util = {}
 
-util.json_decode = vim.fn.json_decode
-util.json_encode = vim.fn.json_encode
 
 util.config = {
     debug_messages = true,
@@ -49,6 +47,13 @@ util.config = {
     pandoc_markdown_to_html_postprocess = function (html)
         return html
     end,
+}
+
+util.request_methods = {
+    GET="GET",
+    PUT="PUT",
+    DELETE="DELETE",
+    POST="POST",
 }
 
 util.metadata = {}

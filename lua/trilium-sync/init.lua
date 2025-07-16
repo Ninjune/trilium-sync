@@ -1,7 +1,6 @@
 local M = {}
 local api = require("trilium-sync.api")
 local util = require("trilium-sync.util")
-local auth = require("trilium-sync.auth")
 local augroup = vim.api.nvim_create_augroup("trilium-sync", { clear = true })
 
 
@@ -13,7 +12,6 @@ local function main()
         util.log("Syncing...")
         api.sync()
     end, {})
-
 end
 
 
@@ -29,7 +27,7 @@ function M.setup()
     vim.api.nvim_create_autocmd("BufWritePost", {
         group = augroup,
         pattern = "*.md",
-        callback = api.push_if_tracked,
+        callback = api.upload.push_current_buffer,
     })
 end
 

@@ -16,6 +16,10 @@ function auth.load_session()
     if f then
         local data = f:read("*a")
         auth.session = vim.fn.json_decode(data) or {}
+        if auth.session == vim.NIL then
+            auth.session = {}
+        end
+
         f:close()
     end
 end
