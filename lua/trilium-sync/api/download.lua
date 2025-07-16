@@ -23,24 +23,37 @@ local function get_note_content(noteId)
     -- api/notes/(noteID)/blob
     local data = curl(util.request_methods.GET, "/notes/" ..noteId.. "/blob")
     local content = vim.fn.json_decode(data).content
+    content = content or ""
+    if content == vim.NIL then content = "" end
 
     return content
 end
 
 
 --- puts a note into local file
----@param title string
+---@param title string ensure this does not have slashes before this method if you don't want it in a folder
 ---@param noteId noteId
 ---@param parent parent|nil
-local function save_note(title, noteId, parent)
-    title = title:gsub("[/\\:*?\"<>|]", "_")
+---@param is_leaf boolean|nil assumed leaf by default
+local function save_note(title, noteId, parent, is_leaf)
+    is_leaf = is_leaf or true
     local content = get_note_content(noteId)
+    if content == vim.NIL or (content == "" and title:find("_dircontent")) then return end
+
     content = util.html_to_markdown(content)
     local relative_file_path = ""
 
     while parent ~= nil do
-        -- TODO: add in the parent's content
+        -- ensure the title when saving the note and in the file path are equal
+        parent.title = parent.title:gsub("[/\\:*?\"<>|]", "_")
         relative_file_path = parent.title.."/"..relative_file_path
+
+        save_note(
+            parent.title .. "/" .. "_dircontent",
+            parent.noteId,
+            parent.parent,
+            false
+        )
         parent = parent.parent
     end
 
@@ -48,15 +61,16 @@ local function save_note(title, noteId, parent)
     vim.fn.mkdir(abs_file_path, "p")
 
     abs_file_path = abs_file_path .. title .. ".md"
+    relative_file_path = relative_file_path .. title .. ".md"
     local f = io.open(abs_file_path, "w")
 
     if f then
         f:write(content or "")
         f:close()
-        util.metadata[relative_file_path] = { noteId = noteId, raw = content }
+        util.metadata[relative_file_path] = { noteId = noteId }
         util.save_metadata()
     else
-        util.log("Failed to write note: " .. title)
+        util.log("Failed to write note: " .. abs_file_path)
     end
 end
 
@@ -125,7 +139,9 @@ function Download.all_notes()
     local tables = gen_tree_tables(tree)
 
     for _, note in ipairs(tables.leaf_note_ids) do
-        save_note(tables.title_lookup_table[note], note, gen_parent(note, tables))
+        local title = tables.title_lookup_table[note]
+        title = title:gsub("[/\\:*?\"<>|]", "_")
+        save_note(title, note, gen_parent(note, tables))
     end
     util.log("Notes downloaded to " .. util.config.notes_dir)
 end

@@ -28,16 +28,13 @@ function Upload.push_current_buffer()
 
         local new_content = table.concat(lines, "\n")
         new_content = util.markdown_to_html(new_content)
-        if new_content ~= entry.raw then
-            util.log("Syncing note: " .. bufname)
-            curl(
-                util.request_methods.PUT,
-                "/notes/" .. entry.noteId .. "/data",
-                vim.fn.json_encode({ content = new_content })
-            )
-            util.metadata[bufname].raw = new_content
-            util.save_metadata()
-        end
+        util.log("Syncing note: " .. bufname)
+        curl(
+            util.request_methods.PUT,
+            "/notes/" .. entry.noteId .. "/data",
+            vim.fn.json_encode({ content = new_content })
+        )
+        util.save_metadata()
     end
 end
 
