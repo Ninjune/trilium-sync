@@ -1,0 +1,12 @@
+---@meta
+---
+---@alias NoteId string
+---@alias parentNoteId string
+---
+---@class (exact) Node
+---@field noteId NoteId
+---@field title string
+---@field children Node|nil
+---
+---@class (exact) TriliumMetadata
+---@field trackedNoteIDs table<NoteId, boolean>

@@ -15,7 +15,7 @@ function auth.load_session()
 
     if f then
         local data = f:read("*a")
-        auth.session = vim.fn.json_decode(data) or {}
+        auth.session = vim.json.decode(data) or {}
         if auth.session == vim.NIL then
             auth.session = {}
         end
@@ -28,7 +28,7 @@ end
 function auth.save_session()
     local f = io.open(util.config.session_file, "w")
     if f then
-        f:write(vim.fn.json_encode(auth.session))
+        f:write(vim.json.encode(auth.session))
         f:close()
     end
 end

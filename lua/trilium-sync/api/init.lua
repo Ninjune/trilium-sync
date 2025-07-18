@@ -24,15 +24,13 @@ end
 
 
 local function sync_cleanup()
-    util.load_metadata()
-
     local existing_files = {}
     for file in vim.fs.dir(config.notes_dir) do
         existing_files[file] = true
         local filepath = config.notes_dir.."/"..file
         local note_not_in_metadata = not util.metadata[filepath] and file:match(".md$")
         if note_not_in_metadata then -- creation
-            util.log("Detected creation: "..filepath)
+            --util.log("Detected creation: "..filepath)
             --util.metadata[filepath] = util.json_encode({ noteId="", raw="" })
         end
     end
@@ -40,10 +38,9 @@ local function sync_cleanup()
     for filename, data in pairs(util.metadata) do
         local note_not_in_files = not existing_files[vim.fs.basename(filename)]
         if note_not_in_files then -- deletion
-            util.log("Detected deletion: " .. filename)
+            --util.log("Detected deletion: " .. filename)
             -- DELETE note
             --curl_delete("/notes/" .. data.noteId)
-            util.metadata[filename] = nil
         end
     end
 

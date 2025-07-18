@@ -1,28 +1,14 @@
----@alias noteId string
----@alias parentNoteId string
----@alias node {
----   noteId: noteId,
----   title: string,
----   children: node|nil,
----}
----@alias tree_tables { 
----    leaf_note_ids: noteId[],
----    parent_lookup_table: {noteId: parentNoteId},
----    title_lookup_table: {noteId: string},
----    clone_lookup_table: { noteId: boolean },
----}
-
 local util = require("trilium-sync.util")
 local curl = require("trilium-sync.api.curl")
 local Download = {}
 
 --- 
----@param noteId noteId
+---@param noteId NoteId
 ---@return string
 local function get_note_content(noteId)
     -- api/notes/(noteID)/blob
     local data = curl(util.request_methods.GET, "/notes/" ..noteId.. "/blob")
-    local content = vim.fn.json_decode(data).content
+    local content = vim.json.decode(data).content
     content = content or ""
     if content == vim.NIL then content = "" end
 
@@ -31,7 +17,7 @@ end
 
 
 --- puts a note into local files: both tree_dir (if it's there) and notes_dir
---- @param root node
+--- @param root Node
 --- @param path string|nil the relative file path of this node
 local function save_tree(root, path)
     path = path or ""
@@ -56,30 +42,18 @@ local function save_tree(root, path)
     local notes_path = util.config.notes_dir.."/"..root.noteId..".md"
 
     -- create the real note
-    local f = io.open(notes_path, "w")
+    util.save_file_async(notes_path, content, function ()
+        util.metadata.trackedNoteIDs[root.noteId] = true;
 
-    if f then
-        f:write(content or "")
-        f:close()
-    else
-        util.log("Failed to write note: " .. notes_path)
-        return false
-    end
-
-    -- create the link in tree
-    ---@diagnostic disable-next-line: undefined-field
-    if not vim.uv.fs_symlink(notes_path, tree_abs_path) then
-        util.log("Failed to write symlink: " .. tree_abs_path)
-        return false
-    end
-
-    return true
+        -- create the link in tree
+        vim.uv.fs_symlink(notes_path, tree_abs_path)
+    end)
 end
 
 
 ---generates the children for a given noteid
 ---@param triliumData table
----@return node[]
+---@return Node[]
 local function gen_children_tree(triliumData)
     -- Step 1: Create noteId to note map
     local notesMap = {}
@@ -144,13 +118,15 @@ function Download.all_notes()
     vim.fn.mkdir(util.config.notes_dir, "p")
     vim.fn.mkdir(util.config.tree_dir, "p")
     local data = curl(util.request_methods.GET, "/tree?subTreeNoteId=root")
-    local tree_data = vim.fn.json_decode(data)
+    local tree_data = vim.json.decode(data)
     local root = gen_children_tree(tree_data)
     --io.popen("echo "..vim.fn.escape(util.debug_dump_table(root), '"').." > /tmp/data.txt")
 
     for _, node in ipairs(root) do
         save_tree(node)
     end
+
+    util.save_metadata()
 end
 
 --- TODO impl
