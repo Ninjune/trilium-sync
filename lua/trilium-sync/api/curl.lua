@@ -26,7 +26,7 @@ local function curl(method, path, data)
     end
 
     local cmd = cmd_base .. cmd_add .. " " .. util.config.api_url .. path
-    util.log(cmd)
+    --util.log(cmd)
     local handle = io.popen(cmd)
 
     if not handle then return "" end

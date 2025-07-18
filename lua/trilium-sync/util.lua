@@ -4,9 +4,10 @@ local util = {}
 util.config = {
     debug_messages = true,
     api_url = "https://notes.ninjune.dev/api",
-    notes_dir = vim.fn.stdpath("data") .. "/trilium-notes",
-    meta_file = vim.fn.stdpath("data") .. "/trilium-notes/.metadata.json",
-    session_file = vim.fn.stdpath("data") .. "/trilium-notes/.session.json",
+    notes_dir = vim.fn.stdpath("data") .. "/trilium-sync/notes",
+    tree_dir = vim.fn.stdpath("data") .. "/trilium-sync/tree",
+    meta_file = vim.fn.stdpath("data") .. "/trilium-sync/.metadata.json",
+    session_file = vim.fn.stdpath("data") .. "/trilium-sync/.session.json",
 
     -- these need spacing on both sides of arguments
     pandoc_markdown_to_html_additional_arguments = nil,
@@ -161,14 +162,12 @@ function util.markdown_to_html(md)
 end
 
 
+---dumps a table to a json string
+---@param o table
+---@return string
 function util.debug_dump_table(o)
     if type(o) == 'table' then
-        local s = '{ '
-        for k,v in pairs(o) do
-            if type(k) ~= 'number' then k = '"'..k..'"' end
-            s = s .. '['..k..'] = ' .. util.debug_dump_table(v) .. ','
-        end
-        return s .. '} '
+        return vim.fn.json_encode(o)
     else
         return tostring(o)
     end

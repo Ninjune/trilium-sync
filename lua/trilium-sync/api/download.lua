@@ -1,20 +1,20 @@
 ---@alias noteId string
 ---@alias parentNoteId string
----@alias parent {
+---@alias node {
 ---   noteId: noteId,
 ---   title: string,
----   parent: parent|nil,
+---   children: node|nil,
 ---}
 ---@alias tree_tables { 
 ---    leaf_note_ids: noteId[],
 ---    parent_lookup_table: {noteId: parentNoteId},
 ---    title_lookup_table: {noteId: string},
+---    clone_lookup_table: { noteId: boolean },
 ---}
 
 local util = require("trilium-sync.util")
 local curl = require("trilium-sync.api.curl")
 local Download = {}
-
 
 --- 
 ---@param noteId noteId
@@ -30,120 +30,127 @@ local function get_note_content(noteId)
 end
 
 
---- puts a note into local file
----@param title string ensure this does not have slashes before this method if you don't want it in a folder
----@param noteId noteId
----@param parent parent|nil
----@param is_leaf boolean|nil assumed leaf by default
-local function save_note(title, noteId, parent, is_leaf)
-    is_leaf = is_leaf or true
-    local content = get_note_content(noteId)
-    if content == vim.NIL or (content == "" and title:find("_dircontent")) then return end
+--- puts a note into local files: both tree_dir (if it's there) and notes_dir
+--- @param root node
+--- @param path string|nil the relative file path of this node
+local function save_tree(root, path)
+    path = path or ""
+
+    local content = get_note_content(root.noteId)
+    assert(content ~= nil and content ~= vim.NIL)
 
     content = util.html_to_markdown(content)
-    local relative_file_path = ""
 
-    while parent ~= nil do
-        -- ensure the title when saving the note and in the file path are equal
-        parent.title = parent.title:gsub("[/\\:*?\"<>|]", "_")
-        relative_file_path = parent.title.."/"..relative_file_path
-
-        save_note(
-            parent.title .. "/" .. "_dircontent",
-            parent.noteId,
-            parent.parent,
-            false
-        )
-        parent = parent.parent
+    if root.children ~= nil then
+        for _, child in ipairs(root.children) do
+            save_tree(child, path..root.title.."/")
+        end
+        path = path..root.title.."/"
     end
 
-    local abs_file_path = util.config.notes_dir .. "/" .. relative_file_path
-    vim.fn.mkdir(abs_file_path, "p")
+    local tree_abs_path = util.config.tree_dir .. "/" .. path
+    vim.fn.mkdir(tree_abs_path, "p")
 
-    abs_file_path = abs_file_path .. title .. ".md"
-    relative_file_path = relative_file_path .. title .. ".md"
-    local f = io.open(abs_file_path, "w")
+    tree_abs_path = tree_abs_path .. root.title .. ".md"
+    path = path .. root.title .. ".md"
+    local notes_path = util.config.notes_dir.."/"..root.noteId..".md"
+
+    -- create the real note
+    local f = io.open(notes_path, "w")
 
     if f then
         f:write(content or "")
         f:close()
-        util.metadata[relative_file_path] = { noteId = noteId }
-        util.save_metadata()
     else
-        util.log("Failed to write note: " .. abs_file_path)
+        util.log("Failed to write note: " .. notes_path)
+        return false
     end
+
+    -- create the link in tree
+    ---@diagnostic disable-next-line: undefined-field
+    if not vim.uv.fs_symlink(notes_path, tree_abs_path) then
+        util.log("Failed to write symlink: " .. tree_abs_path)
+        return false
+    end
+
+    return true
 end
 
 
----generates some needed tables for downloading notes
----
----@param tree table
----@return tree_tables
-local function gen_tree_tables(tree)
-    --@type boolean[]
-    local parent_note_ids = {}
-    local parent_lookup_table = {}
-    local title_lookup_table = {}
-
-    for _, branch in ipairs(tree.branches) do
-        parent_note_ids[branch.parentNoteId] = true
-        parent_lookup_table[branch.noteId] = branch.parentNoteId
+---generates the children for a given noteid
+---@param triliumData table
+---@return node[]
+local function gen_children_tree(triliumData)
+    -- Step 1: Create noteId to note map
+    local notesMap = {}
+    for _, note in ipairs(triliumData.notes) do
+        notesMap[note.noteId] = {
+            title = note.title:gsub("[/\\:*?\"<>|]", "_"),
+            noteId = note.noteId
+        }
     end
 
-    local leaf_note_ids = {}
-    for _, note in ipairs(tree.notes) do
-        if not parent_note_ids[note.noteId] and note.mime == "text/html" then
-            table.insert(leaf_note_ids, note.noteId)
+    -- Step 2: Build parent-child relationships
+    local childrenMap = {}
+    for _, branch in ipairs(triliumData.branches) do
+        if branch.parentNoteId ~= "none" then
+            if not childrenMap[branch.parentNoteId] then
+                childrenMap[branch.parentNoteId] = {}
+            end
+            table.insert(childrenMap[branch.parentNoteId], {
+                noteId = branch.noteId,
+                position = branch.notePosition
+            })
         end
-        title_lookup_table[note.noteId] = note.title
     end
 
-    return {
-        leaf_note_ids=leaf_note_ids,
-        parent_lookup_table=parent_lookup_table,
-        title_lookup_table=title_lookup_table
-    }
-end
+    -- Step 3: Recursive function to build the tree
+    local function buildTree(parentNoteId)
+        local result = {}
+        local index = 1
 
+        if not childrenMap[parentNoteId] then return result end
 
----generates the parents for a given noteid
----@param noteId noteId note id to generate parents for
----@param tables tree_tables
----@return parent|nil
-local function gen_parent(noteId, tables)
-    -- base case
-    local parentId = tables.parent_lookup_table[noteId]
-    assert(parentId ~= nil and parentId ~= "none")
-    if parentId == "root" then
-        return nil
+        for _, child in ipairs(childrenMap[parentNoteId]) do
+            local childNote = notesMap[child.noteId]
+            if not childNote then goto continue end
+
+            local node = {
+                title = childNote.title,
+                noteId = child.noteId
+            }
+
+            -- Recursively build children
+            local grandchildren = buildTree(child.noteId)
+            if next(grandchildren) ~= nil then
+                node.children = grandchildren
+            end
+
+            result[index] = node
+            index = index + 1
+
+            ::continue::
+        end
+
+        return result
     end
 
-    ---@type parent
-    local parent = {}
-    parent.noteId = parentId
-    parent.title = tables.title_lookup_table[parentId]
-    parent.parent = gen_parent(parentId, tables)
-
-
-    return parent
+    return buildTree("root")
 end
 
 
 --- saves all of the notes to the data folder
 function Download.all_notes()
     vim.fn.mkdir(util.config.notes_dir, "p")
+    vim.fn.mkdir(util.config.tree_dir, "p")
     local data = curl(util.request_methods.GET, "/tree?subTreeNoteId=root")
-    local tree = vim.fn.json_decode(data)
+    local tree_data = vim.fn.json_decode(data)
+    local root = gen_children_tree(tree_data)
+    --io.popen("echo "..vim.fn.escape(util.debug_dump_table(root), '"').." > /tmp/data.txt")
 
-    -- create notes
-    local tables = gen_tree_tables(tree)
-
-    for _, note in ipairs(tables.leaf_note_ids) do
-        local title = tables.title_lookup_table[note]
-        title = title:gsub("[/\\:*?\"<>|]", "_")
-        save_note(title, note, gen_parent(note, tables))
+    for _, node in ipairs(root) do
+        save_tree(node)
     end
-    util.log("Notes downloaded to " .. util.config.notes_dir)
 end
 
 --- TODO impl
