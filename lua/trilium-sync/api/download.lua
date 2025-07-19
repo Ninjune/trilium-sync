@@ -1,6 +1,9 @@
 local util = require("trilium-sync.util")
 local curl = require("trilium-sync.api.curl")
-local Download = {}
+local Download = {
+    _branch_count = 0,
+    _max_branch_count = 0
+}
 
 --- 
 ---@param noteId NoteId
@@ -41,11 +44,15 @@ local function save_tree(root, path)
     path = path .. root.title .. ".md"
     local notes_path = util.config.notes_dir.."/"..root.noteId..".md"
 
+    Download._branch_count = Download._branch_count + 1
+    vim.notify("[trilium-sync] "..Download._branch_count.."/"..Download._max_branch_count, vim.log.levels.INFO)
+    vim.cmd("redraw")
+
     -- create the real note
     util.save_file_async(notes_path, content, function ()
         util.metadata.trackedNoteIDs[root.noteId] = true;
 
-        -- create the link in tree
+        -- create the link in tree (this is allowed to error)
         vim.uv.fs_symlink(notes_path, tree_abs_path)
     end)
 end
@@ -88,6 +95,7 @@ local function gen_children_tree(triliumData)
         for _, child in ipairs(childrenMap[parentNoteId]) do
             local childNote = notesMap[child.noteId]
             if not childNote then goto continue end
+            Download._max_branch_count = Download._max_branch_count + 1
 
             local node = {
                 title = childNote.title,
@@ -126,6 +134,8 @@ function Download.all_notes()
         save_tree(node)
     end
 
+    Download._max_branch_count = 0
+    Download._branch_count = 0
     util.save_metadata()
 end
 

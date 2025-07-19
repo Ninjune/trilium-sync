@@ -23,7 +23,7 @@ function Api.init_session()
 end
 
 
-local function sync_cleanup()
+local function unused()
     local existing_files = {}
     for file in vim.fs.dir(config.notes_dir) do
         existing_files[file] = true
@@ -53,8 +53,7 @@ function Api.sync()
     -- make sure session is initialized
     Api.init_session()
 
-    -- cleanup the sync (check for renames/deletions)
-    sync_cleanup()
+    unused()
 
     -- fetch the notes to sync files
     Api.download.all_notes()
