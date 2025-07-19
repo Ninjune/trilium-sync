@@ -125,6 +125,9 @@ end
 function Download.all_notes()
     vim.fn.mkdir(util.config.notes_dir, "p")
     vim.fn.mkdir(util.config.tree_dir, "p")
+    -- prime the tree (expand all subfolders)
+    curl(util.request_methods.PUT, "/branches/none_root/expanded-subtree/1")
+
     local data = curl(util.request_methods.GET, "/tree?subTreeNoteId=root")
     local tree_data = vim.json.decode(data)
     local root = gen_children_tree(tree_data)
