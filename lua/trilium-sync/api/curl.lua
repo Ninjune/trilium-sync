@@ -7,7 +7,7 @@ local auth = require("trilium-sync.auth")
 ---@param method string One of request_methods
 ---@param path string The api path for after /api
 ---@param data string|nil Can only be nil when method is not equal to PUT or POST
----@return string
+---@return string unparsed data
 local function curl(method, path, data)
     data = data or ""
 
