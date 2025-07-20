@@ -29,6 +29,15 @@ function M.setup()
         pattern = "*.md",
         callback = api.upload.push_current_buffer,
     })
+
+    vim.api.nvim_create_autocmd("BufNewFile", {
+        group = "augroup",
+        pattern = "*.md",
+        callback = function ()
+            local file_path = vim.fn.expand("<afile>:p")
+            if not file_path:sub(1, util.config.tree_dir:len()) == util.config.tree_dir then return end
+        end
+    })
 end
 
 

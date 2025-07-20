@@ -1,7 +1,11 @@
 local util = require("trilium-sync.util")
 local auth = require("trilium-sync.auth")
 local curl = require("trilium-sync.api.curl")
-local Api = { download=require("trilium-sync.api.download"), upload=require("trilium-sync.api.upload") }
+local Api = {
+    download=require("trilium-sync.api.download"),
+    upload=require("trilium-sync.api.upload"),
+    create=require("trilium-sync.api.create")
+}
 
 local config = util.config
 

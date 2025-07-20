@@ -61,6 +61,7 @@ util.request_methods = {
 ---@type TriliumMetadata
 util.metadata = {
     trackedNoteIDs = {},
+    tree = {},
 }
 
 
@@ -106,6 +107,7 @@ end
 
 
 function util.load_metadata()
+    util.log("Reading metadata!")
     util.read_file_async(util.config.meta_file, function (data)
         if not data or data == "" then return end
         data = vim.json.decode(data)
@@ -117,7 +119,11 @@ end
 
 
 function util.save_metadata()
-    util.save_file_async(util.config.meta_file, vim.json.encode(util.metadata))
+    local f = io.open(util.config.meta_file, "w")
+    if f then
+        f:write(vim.json.encode(util.metadata))
+        f:close()
+    end
 end
 
 ---logs a message to :messages

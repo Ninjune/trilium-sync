@@ -33,7 +33,6 @@ function Upload.push_current_buffer()
         "/notes/" .. noteId .. "/data",
         vim.json.encode({ content = new_content })
     )
-    util.save_metadata()
 end
 
 

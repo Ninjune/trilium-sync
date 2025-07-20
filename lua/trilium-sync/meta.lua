@@ -9,4 +9,5 @@
 ---@field children Node|nil
 ---
 ---@class (exact) TriliumMetadata
----@field trackedNoteIDs table<NoteId, boolean>
+---@field trackedNoteIDs table<NoteId, { tracked: boolean, date_modified: string }>
+---@field tree Node[]
