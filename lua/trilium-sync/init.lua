@@ -31,7 +31,7 @@ function M.setup()
     })
 
     vim.api.nvim_create_autocmd("BufNewFile", {
-        group = "augroup",
+        group = augroup,
         pattern = "*.md",
         callback = function ()
             local file_path = vim.fn.expand("<afile>:p")
